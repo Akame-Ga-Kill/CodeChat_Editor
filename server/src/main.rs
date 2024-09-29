@@ -16,19 +16,16 @@
 ///
 /// # `main.rs` -- Entrypoint for the CodeChat Editor Server
 use code_chat_editor::webserver;
-use actix_web::main as actix_main;  // Import the Actix runtime's main function
+use actix_rt::System;
 
-// The #[cfg(not(tarpaulin_include))] attribute ensures that this code
-// is not included in the test coverage measurement using tarpaulin (a code coverage tool).
-#[cfg(not(tarpaulin_include))]
-// The #[actix_main] macro replaces the default Rust main function with an asynchronous runtime for Actix.
-#[actix_main]
-async fn main() -> std::io::Result<()> {
-    // Configure the logger using log4rs, which reads from a configuration file to initialize logging.
-    webserver::configure_logger();
-    
-    // Call the main server function from webserver.rs and await its result.
-    // This function starts the HTTP server, dynamically selects an available port, and listens for incoming requests.
-    webserver::main().await
+fn main() -> std::io::Result<()> {
+    webserver::configure_logger();  // Set up the logger
+
+    // Create an Actix system
+    let sys = System::new();
+
+    // Call webserver::main() directly without await or block_on
+    webserver::main()?;
+
+    sys.run()
 }
-

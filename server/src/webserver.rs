@@ -878,25 +878,62 @@ async fn client_websocket(
 // ## Webserver core
 #[actix_web::main]
 pub async fn main() -> std::io::Result<()> {
-    run_server().await
+    // Try to find an available port, starting at 8080 and checking 10 ports
+    let start_port = 8080;
+    let max_attempts = 10;
+
+    if let Some(port) = find_available_port(start_port, max_attempts) {
+        println!("Using port: {}", port);
+        run_server(port).await
+    } else {
+        eprintln!("Error: Could not find an available port in the range {}-{}", start_port, start_port + max_attempts);
+        std::process::exit(1);
+    }
 }
 
-pub async fn run_server() -> std::io::Result<()> {
+// The main function that starts the Actix web server and binds it to a specified port.
+pub async fn run_server(port: u16) -> std::io::Result<()> {
     // Pre-load the bundled files before starting the webserver.
     let _ = &*BUNDLED_FILES_MAP;
     let _ = &*CODECHAT_EDITOR_FRAMEWORK_JS;
     let app_data = make_app_data();
+
+    // Bind the server to the dynamic port.
+    let bind_address = format!("127.0.0.1:{}", port);
     let server = match HttpServer::new(move || configure_app(App::new(), &app_data))
-        .bind((IP_ADDRESS, IP_PORT))
+        .bind(bind_address)
     {
         Ok(server) => server,
         Err(err) => {
-            error!("Unable to bind to {IP_ADDRESS}:{IP_PORT} - {err}");
+            error!("Unable to bind to 127.0.0.1:{} - {err}", port);
             return Err(err);
         }
     };
     server.run().await
 }
+
+// Function to find an available port, starting from a given port.
+fn find_available_port(start_port: u16, max_attempts: u16) -> Option<u16> {
+    let mut port = start_port;
+
+    for _ in 0..max_attempts {
+        if is_port_available(port) {
+            return Some(port);
+        }
+        port += 1; // Try the next port
+    }
+
+    None // Return None if no available port is found within the range
+}
+
+// Function to check if a port is available.
+fn is_port_available(port: u16) -> bool {
+    match std::net::TcpListener::bind(("127.0.0.1", port)) {
+        Ok(_) => true,  // Port is available
+        Err(_) => false,  // Port is occupied
+    }
+}
+
 
 pub fn configure_logger() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
